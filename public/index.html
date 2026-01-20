@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>gogogo Terminal</title>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+            background: #0a0a0a;
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
+        }
+        body {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        #terminal-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 50px;
+            padding: 8px;
+            /* Custom touch handling - disable native scrolling */
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            /* Disable iOS momentum scrolling - we handle it ourselves */
+            -webkit-overflow-scrolling: auto;
+            overscroll-behavior: contain;
+        }
+        .xterm-viewport {
+            overflow-y: auto !important;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            /* Disable native touch handling for custom implementation */
+            touch-action: none;
+            -webkit-overflow-scrolling: auto;
+        }
+        .xterm-viewport::-webkit-scrollbar {
+            display: none;
+        }
+        .xterm-screen {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #scroll-to-bottom {
+            position: fixed;
+            bottom: 60px;
+            right: 12px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.9);
+            border: none;
+            color: white;
+            cursor: pointer;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+        #scroll-to-bottom.visible {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+        #scroll-to-bottom:hover {
+            background: rgba(59, 130, 246, 1);
+            transform: scale(1.1);
+        }
+        #scroll-to-bottom:active {
+            transform: scale(0.95);
+        }
+        #scroll-to-bottom svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+        #status-dot {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #22c55e;
+            z-index: 1000;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+            transition: all 0.3s ease;
+        }
+        #status-dot.disconnected {
+            background: #ef4444;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+        }
+        #status-dot.connecting {
+            background: #f59e0b;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 12px;
+            background: rgba(26, 26, 26, 0.95);
+            border-top: 1px solid #333;
+            z-index: 1000;
+        }
+        #input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            position: relative;
+        }
+        #input {
+            flex: 1;
+            min-height: 34px;
+            max-height: 100px;
+            background: #0a0a0a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 8px 45px 8px 12px;
+            color: #fff;
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            resize: none;
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        #input::-webkit-scrollbar { display: none; }
+        #input:focus { border-color: #3b82f6; }
+
+        /* Voice input button inside the input field */
+        #voice-btn {
+            position: absolute;
+            right: 52px;
+            bottom: 7px;
+            width: 32px;
+            height: 32px;
+            background: transparent;
+            border: none;
+            border-radius: 50%;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            z-index: 10;
+        }
+        #voice-btn:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+        #voice-btn.active {
+            background: #ef4444;
+            color: white;
+            animation: voice-pulse 1.5s infinite;
+            z-index: 20;
+        }
+        #voice-btn.active:hover {
+            background: #dc2626;
+        }
+
+        /* Voice animation */
+        @keyframes voice-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Voice waveform animation */
+        .voice-wave {
+            display: none;
+            position: absolute;
+            right: 58px;
+            bottom: 17px;
+            width: 20px;
+            height: 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #voice-btn.active + .voice-wave {
+            display: flex;
+        }
+        .voice-bar {
+            width: 3px;
+            height: 100%;
+            background: #ef4444;
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .voice-bar:nth-child(1) { animation-delay: 0s; }
+        .voice-bar:nth-child(2) { animation-delay: 0.1s; }
+        .voice-bar:nth-child(3) { animation-delay: 0.2s; }
+        .voice-bar:nth-child(4) { animation-delay: 0.3s; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.3); }
+            50% { transform: scaleY(1); }
+        }
+
+        /* Transcription indicator */
+        .transcription-text {
+            position: absolute;
+            bottom: 45px;
+            left: 12px;
+            right: 12px;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.2));
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            border-radius: 8px;
+            color: #93c5fd;
+            font-size: 13px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            display: none;
+            white-space: pre-wrap;
+            /* Don't block touch events */
+            pointer-events: none;
+            word-wrap: break-word;
+            max-height: 80px;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15),
+                        0 0 40px rgba(59, 130, 246, 0.1) inset,
+                        0 1px 0 rgba(255, 255, 255, 0.1) inset;
+            animation: slideUp 0.3s ease-out;
+            transition: all 0.3s ease;
+        }
+
+        .transcription-text.visible {
+            display: block;
+            animation: slideUp 0.3s ease-out, pulse 2s ease-in-out infinite;
+        }
+
+        /* Subtle pulse animation */
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15),
+                            0 0 40px rgba(59, 130, 246, 0.1) inset,
+                            0 1px 0 rgba(255, 255, 255, 0.1) inset;
+            }
+            50% {
+                box-shadow: 0 4px 25px rgba(59, 130, 246, 0.25),
+                            0 0 50px rgba(59, 130, 246, 0.15) inset,
+                            0 1px 0 rgba(255, 255, 255, 0.15) inset;
+            }
+        }
+
+        /* Slide up animation */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Custom scrollbar for transcription */
+        .transcription-text::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .transcription-text::-webkit-scrollbar-track {
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 2px;
+        }
+
+        .transcription-text::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.5);
+            border-radius: 2px;
+        }
+
+        .transcription-text::-webkit-scrollbar-thumb:hover {
+            background: rgba(59, 130, 246, 0.7);
+        }
+
+        /* Strong text in transcription (final results) */
+        .transcription-text strong {
+            color: #dbeafe;
+            font-weight: 600;
+        }
+
+        /* Interim text (partial results) */
+        .transcription-text span {
+            color: #93c5fd;
+            opacity: 0.8;
+        }
+
+        /* Special keys button */
+        #special-keys-btn {
+            width: 40px;
+            height: 40px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        #special-keys-btn:hover {
+            background: #2a2a2a;
+            color: #fff;
+            border-color: #555;
+        }
+        #special-keys-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Special keys popup */
+        #special-keys-popup {
+            position: fixed;
+            bottom: 60px;
+            right: 12px;
+            background: rgba(26, 26, 26, 0.98);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 8px;
+            display: none;
+            z-index: 1001;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            min-width: 350px;
+            max-width: 400px;
+        }
+        #special-keys-popup.show {
+            display: block;
+        }
+        .key-group {
+            margin-bottom: 8px;
+        }
+        .key-group:last-child {
+            margin-bottom: 0;
+        }
+        .key-group-title {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            padding: 0 4px;
+        }
+        .key-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .special-key {
+            padding: 6px 10px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            min-width: 40px;
+            text-align: center;
+        }
+        .special-key:hover {
+            background: #1a1a1a;
+            border-color: #3b82f6;
+        }
+        .special-key:active {
+            transform: scale(0.95);
+            background: #3b82f6;
+        }
+
+        /* Debug console styles */
+        .debug-console {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #333;
+        }
+        .debug-title {
+            color: #3b82f6;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .debug-control {
+            margin-bottom: 8px;
+        }
+        .debug-control label {
+            display: block;
+            color: #888;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        .debug-control input[type="number"] {
+            width: 100%;
+            padding: 4px 8px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+        }
+        .debug-control input[type="number"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .context-preview {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 8px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 11px;
+            color: #888;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+        }
+        .context-preview::-webkit-scrollbar {
+            width: 4px;
+        }
+        .context-preview::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        .context-preview::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 2px;
+        }
+        .api-status {
+            margin-top: 8px;
+            padding: 4px 8px;
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            font-size: 11px;
+            color: #888;
+        }
+        .api-status.connected {
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+        .api-status.error {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        /* Context overlay - shows when recording */
+        #context-overlay {
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            max-width: 600px;
+            width: 90%;
+            background: rgba(26, 26, 26, 0.98);
+            border: 1px solid #3b82f6;
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+            z-index: 1002;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            /* Allow touch events to pass through to terminal when hidden */
+            pointer-events: none;
+        }
+        #context-overlay.visible {
+            display: block;
+            /* Block touch events only when visible */
+            pointer-events: auto;
+        }
+        #context-overlay-title {
+            color: #3b82f6;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        #context-overlay-content {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 11px;
+            color: #888;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+        }
+        #context-overlay-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        #context-overlay-content::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        #context-overlay-content::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal-container"></div>
+
+    <!-- Context overlay - shows when recording -->
+    <div id="context-overlay">
+        <div id="context-overlay-title">🎙️ Using Terminal Context for Voice Recognition</div>
+        <div id="context-overlay-content">No context available yet...</div>
+    </div>
+
+    <!-- Status indicator -->
+    <div id="status-dot" class="connecting"></div>
+
+    <!-- Scroll to bottom button -->
+    <button id="scroll-to-bottom">
+        <svg viewBox="0 0 24 24">
+            <path d="M7 10l5 5 5-5H7z"/>
+        </svg>
+    </button>
+
+    <!-- Input area -->
+    <div id="input-area">
+        <!-- Transcription text display -->
+        <div class="transcription-text" id="transcription"></div>
+
+        <div id="input-wrapper">
+            <textarea id="input" placeholder="Type command or use voice input..." rows="1"></textarea>
+
+            <!-- Voice input button inside input field -->
+            <button id="voice-btn" title="Voice input (Click to start/stop)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+            </button>
+
+            <!-- Voice waveform animation -->
+            <div class="voice-wave">
+                <div class="voice-bar"></div>
+                <div class="voice-bar"></div>
+                <div class="voice-bar"></div>
+                <div class="voice-bar"></div>
+            </div>
+
+            <!-- Special keys button -->
+            <button id="special-keys-btn" title="Special keys">⌘</button>
+        </div>
+    </div>
+
+    <!-- Special keys popup -->
+    <div id="special-keys-popup">
+        <div class="key-group">
+            <div class="key-group-title">Control</div>
+            <div class="key-buttons">
+                <button class="special-key" data-key="Escape">Esc</button>
+                <button class="special-key" data-key="Tab">Tab</button>
+                <button class="special-key" data-key="Up">↑</button>
+                <button class="special-key" data-key="Down">↓</button>
+                <button class="special-key" data-key="Left">←</button>
+                <button class="special-key" data-key="Right">→</button>
+            </div>
+        </div>
+        <div class="key-group">
+            <div class="key-group-title">Shortcuts</div>
+            <div class="key-buttons">
+                <button class="special-key" data-key="Ctrl+C">Ctrl+C</button>
+                <button class="special-key" data-key="Ctrl+D">Ctrl+D</button>
+                <button class="special-key" data-key="Ctrl+Z">Ctrl+Z</button>
+                <button class="special-key" data-key="Ctrl+L">Clear</button>
+            </div>
+        </div>
+        <div class="key-group">
+            <div class="key-group-title">Navigation</div>
+            <div class="key-buttons">
+                <button class="special-key" data-key="Home">Home</button>
+                <button class="special-key" data-key="End">End</button>
+                <button class="special-key" data-key="PageUp">PgUp</button>
+                <button class="special-key" data-key="PageDown">PgDn</button>
+            </div>
+        </div>
+        <div class="key-group">
+            <div class="key-group-title">Function</div>
+            <div class="key-buttons">
+                <button class="special-key" data-key="F1">F1</button>
+                <button class="special-key" data-key="F2">F2</button>
+                <button class="special-key" data-key="F3">F3</button>
+                <button class="special-key" data-key="F4">F4</button>
+            </div>
+        </div>
+
+        <!-- Debug Console for ASR -->
+        <div class="debug-console">
+            <div class="debug-title">🎙️ ASR Settings</div>
+            <div class="debug-control">
+                <label for="context-length">Context Length (characters):</label>
+                <input type="number" id="context-length" min="100" max="10000" value="2000" step="100">
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/terminal.js"></script>
+    <script src="/js/terminal-asr.js"></script>
+    <script src="/js/voice-input.js"></script>
+</body>
+</html>
