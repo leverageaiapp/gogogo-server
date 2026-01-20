@@ -1,0 +1,27 @@
+# Source files (TypeScript)
+src/
+*.ts
+!dist/**/*.d.ts
+
+# Config files not needed in package
+tsconfig.json
+.gitignore
+.github/
+
+# Development files
+*.log
+*.tgz
+coverage/
+.idea/
+.vscode/
+
+# Documentation that's not needed in package
+CONTRIBUTING.md
+CHANGELOG.md
+
+# Test files
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
