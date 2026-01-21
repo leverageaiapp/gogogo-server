@@ -9,13 +9,6 @@ const MIN_PORT = 8000;
 const MAX_PORT = 65535;
 
 /**
- * Generate a random 6-digit PIN
- */
-function generateRandomPIN(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-/**
  * Validate PIN format (6 digits)
  */
 function validatePIN(pin: string): boolean {
@@ -137,17 +130,18 @@ export async function startSession(machineName: string, userPin?: string, comman
     process.env.no_proxy = process.env.NO_PROXY;
 
     try {
-        // Generate or validate PIN silently
-        let pin: string;
+        // Handle PIN - default is no PIN (direct access)
+        let pin: string = '';
+        
         if (userPin) {
+            // User specified a PIN, validate it
             if (validatePIN(userPin)) {
                 pin = userPin;
             } else {
                 throw new Error('PIN must be exactly 6 digits');
             }
-        } else {
-            pin = generateRandomPIN();
         }
+        // If no PIN provided, pin remains empty string (no authentication)
 
         // Show progress steps
         console.log('  Finding available port...');
@@ -177,11 +171,11 @@ export async function startSession(machineName: string, userPin?: string, comman
         // Display QR code and connection info
         displayQRCode(tunnelUrl);
 
-        // Show PIN after QR code
-        if (userPin) {
-            console.log(`    PIN for web access: ${pin}`);
+        // Show PIN info after QR code
+        if (pin) {
+            console.log(`    🔐 PIN for web access: ${pin}`);
         } else {
-            console.log(`    Generated PIN for web access: ${pin}`);
+            console.log('    🔓 No PIN required - direct access enabled');
         }
         console.log('');
         console.log('  Started.');

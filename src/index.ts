@@ -16,7 +16,7 @@ program
     .description('Start a new gogogo session')
     .argument('[command...]', 'Command to run (default: none, opens terminal only)')
     .option('-n, --name <name>', 'Machine name to display', process.env.HOSTNAME || 'My Computer')
-    .option('-p, --pin <pin>', 'Set a 6-digit PIN for web access security (auto-generated if not provided)')
+    .option('-pin <pin>', 'Set a 6-digit PIN for web access security (default: no PIN, direct access)')
     .option('--debug-asr', 'Enable verbose ASR (voice recognition) logging')
     .allowUnknownOption(true)
     .action(async (command, options) => {
@@ -24,6 +24,7 @@ program
         console.log('  🚀 gogogo - Coding anywhere in your pocket');
         console.log('');
 
+        // PIN is optional - if not provided, no authentication required
         await startSession(options.name, options.pin, command, { debugAsr: options.debugAsr });
     });
 
