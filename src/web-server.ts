@@ -629,6 +629,18 @@ export function startWebServer(port: number, pin?: string, options: WebServerOpt
                 return next();
             }
 
+            // Skip static asset requests (favicon, images, etc.)
+            const staticExtensions = ['.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.css', '.js', '.map', '.woff', '.woff2', '.ttf', '.eot'];
+            if (staticExtensions.some(ext => req.path.endsWith(ext))) {
+                return res.status(404).end();
+            }
+
+            // Only serve index.html for HTML requests (browser navigation)
+            const acceptHeader = req.get('Accept') || '';
+            if (!acceptHeader.includes('text/html')) {
+                return res.status(404).end();
+            }
+
             const indexPath = path.join(publicDir, 'index.html');
             if (fs.existsSync(indexPath)) {
                 res.sendFile(indexPath);

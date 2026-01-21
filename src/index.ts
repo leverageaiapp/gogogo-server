@@ -3,13 +3,20 @@
 import { Command } from 'commander';
 import { startSession } from './session';
 import { getConfig, setConfig } from './config';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Read version from package.json
+const packageJsonPath = path.join(__dirname, '..', 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+const version = packageJson.version;
 
 const program = new Command();
 
 program
     .name('gogogo')
     .description('gogogo - Forward Claude Code to your mobile device')
-    .version('0.1.0');
+    .version(version);
 
 program
     .command('start')
