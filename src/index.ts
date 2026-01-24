@@ -23,7 +23,7 @@ program
     .description('Start a new gogogo session')
     .argument('[command...]', 'Command to run (default: none, opens terminal only)')
     .option('-n, --name <name>', 'Machine name to display', process.env.HOSTNAME || 'My Computer')
-    .option('-pin <pin>', 'Set a 6-digit PIN for web access security (default: no PIN, direct access)')
+    .option('--pin <pin>', 'Set a 6-digit PIN for web access security (default: no PIN, direct access)')
     .option('--debug-asr', 'Enable verbose ASR (voice recognition) logging')
     .allowUnknownOption(true)
     .action(async (command, options) => {
