@@ -236,7 +236,10 @@ function updateStatus(state) {
 
 function connect() {
     // WebSocket will automatically include cookies with the request
-    const wsUrl = location.protocol.replace('http', 'ws') + '//' + location.host + '/ws';
+    // Build WebSocket URL relative to current location
+    // Remove any trailing slash from pathname
+    const basePath = location.pathname.replace(/\/$/, '');
+    const wsUrl = location.protocol.replace('http', 'ws') + '//' + location.host + basePath + '/ws';
 
     // For debugging - log if auth cookie exists
     const hasCookie = document.cookie.includes('auth=');

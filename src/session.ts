@@ -3,7 +3,7 @@ import * as net from 'net';
 import * as http from 'http';
 import { spawnPTY, killPTY, onPTYExit } from './pty';
 import { startWebServer, stopWebServer } from './web-server';
-import { startTunnel, stopTunnel } from './cloudflare-tunnel';
+import { startTunnel, stopTunnel } from './vortex-tunnel';
 
 const MIN_PORT = 8000;
 const MAX_PORT = 65535;
@@ -109,6 +109,7 @@ function displayQRCode(url: string): void {
 
 export interface SessionOptions {
     debugAsr?: boolean;
+    gatewayUrl?: string;
 }
 
 export async function startSession(machineName: string, userPin?: string, command?: string[], options: SessionOptions = {}): Promise<void> {
@@ -132,7 +133,7 @@ export async function startSession(machineName: string, userPin?: string, comman
     try {
         // Handle PIN - default is no PIN (direct access)
         let pin: string = '';
-        
+
         if (userPin) {
             // User specified a PIN, validate it
             if (validatePIN(userPin)) {
@@ -158,7 +159,7 @@ export async function startSession(machineName: string, userPin?: string, comman
         let tunnelUrl: string;
 
         try {
-            tunnelUrl = await startTunnel(port);
+            tunnelUrl = await startTunnel(port, options.gatewayUrl);
         } catch (error) {
             console.log('');
             console.log('  ❌ Failed to create tunnel:');

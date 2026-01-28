@@ -33,7 +33,7 @@ class VoiceInput {
     // Check if debug mode is enabled on server
     async checkDebugMode() {
         try {
-            const response = await fetch('/api/terminal-context');
+            const response = await fetch('api/terminal-context');
             if (response.ok) {
                 const data = await response.json();
                 this.debugMode = data.debugAsr || false;
